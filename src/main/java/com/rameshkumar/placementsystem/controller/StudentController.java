@@ -3,10 +3,15 @@ package com.rameshkumar.placementsystem.controller;
 import com.rameshkumar.placementsystem.dto.PaginationResponse;
 import com.rameshkumar.placementsystem.dto.StudentDTO;
 import com.rameshkumar.placementsystem.service.StudentService;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+
+import jakarta.validation.Valid;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @Tag(name = "Student APIs", description = "Operations related to student management")
@@ -21,6 +26,7 @@ public class StudentController {
     }
 
     // CREATE STUDENT
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create a new student")
     @PostMapping
     public StudentDTO createStudent(@Valid @RequestBody StudentDTO studentDTO) {
@@ -28,6 +34,7 @@ public class StudentController {
     }
 
     // GET ALL STUDENTS
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get all students")
     @GetMapping
     public List<StudentDTO> getAllStudents() {
@@ -42,6 +49,7 @@ public class StudentController {
     }
 
     // UPDATE STUDENT
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update student details")
     @PutMapping("/{id}")
     public StudentDTO updateStudent(@PathVariable Long id,
@@ -50,6 +58,7 @@ public class StudentController {
     }
 
     // DELETE STUDENT
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete student by ID")
     @DeleteMapping("/{id}")
     public String deleteStudent(@PathVariable Long id) {
