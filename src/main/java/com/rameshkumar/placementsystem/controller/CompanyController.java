@@ -40,16 +40,14 @@ public class CompanyController {
         return new ApiResponse<>(true, "Company created successfully", savedCompany);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Get all companies",
-            description = "Returns all company records. Accessible only to ADMIN users.",
+            description = "Returns all company records for authenticated users.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Companies fetched successfully"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @GetMapping
     public ApiResponse<List<CompanyDTO>> getAllCompanies(@RequestParam(required = false) String role) {
@@ -59,22 +57,39 @@ public class CompanyController {
         return new ApiResponse<>(true, "Companies fetched successfully", companies);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Get company by ID",
-            description = "Returns a single company by id. Accessible only to ADMIN users.",
+            description = "Returns a single company by id for authenticated users.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Company fetched successfully"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Company not found")
     })
     @GetMapping("/{id}")
     public ApiResponse<CompanyDTO> getCompanyById(@PathVariable Long id) {
         CompanyDTO company = companyService.getCompanyById(id);
         return new ApiResponse<>(true, "Company fetched successfully", company);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Update company by ID",
+            description = "Updates a company record by id. Accessible only to ADMIN users.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Company updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Company not found")
+    })
+    @PutMapping("/{id}")
+    public ApiResponse<CompanyDTO> updateCompany(@PathVariable Long id, @Valid @RequestBody CompanyDTO companyDTO) {
+        CompanyDTO updatedCompany = companyService.updateCompany(id, companyDTO);
+        return new ApiResponse<>(true, "Company updated successfully", updatedCompany);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

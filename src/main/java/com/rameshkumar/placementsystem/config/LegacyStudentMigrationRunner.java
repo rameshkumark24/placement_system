@@ -31,6 +31,8 @@ public class LegacyStudentMigrationRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        ensureApplicationStudentForeignKey();
+
         if (!hasLegacyStudentColumns()) {
             logger.info("Legacy student migration skipped because legacy columns are not present");
             return;
@@ -95,6 +97,41 @@ public class LegacyStudentMigrationRunner implements ApplicationRunner {
         } else {
             logger.info("No legacy application rows required remapping");
         }
+    }
+
+    private void ensureApplicationStudentForeignKey() {
+        List<Map<String, Object>> foreignKeys = jdbcTemplate.queryForList(
+                """
+                select constraint_name, referenced_table_name
+                from information_schema.key_column_usage
+                where table_schema = database()
+                  and table_name = 'application'
+                  and column_name = 'student_id'
+                  and referenced_table_name is not null
+                """
+        );
+
+        for (Map<String, Object> foreignKey : foreignKeys) {
+            String constraintName = (String) foreignKey.get("constraint_name");
+            String referencedTableName = (String) foreignKey.get("referenced_table_name");
+
+            if ("student".equalsIgnoreCase(referencedTableName)) {
+                logger.info("Application foreign key already points to student table");
+                return;
+            }
+
+            logger.warn("Repairing application.student_id foreign key from {} to student", referencedTableName);
+            jdbcTemplate.execute("alter table application drop foreign key " + constraintName);
+        }
+
+        jdbcTemplate.execute(
+                """
+                alter table application
+                add constraint fk_application_student
+                foreign key (student_id) references student(id)
+                """
+        );
+        logger.info("Application foreign key repaired to reference student(id)");
     }
 
     private User createLegacyUser(String name, String email, String password) {

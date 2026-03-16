@@ -2,6 +2,7 @@ package com.rameshkumar.placementsystem.service;
 
 import com.rameshkumar.placementsystem.dto.PaginationResponse;
 import com.rameshkumar.placementsystem.dto.StudentDTO;
+import com.rameshkumar.placementsystem.dto.StudentProfileUpdateRequest;
 
 import java.util.List;
 
@@ -16,6 +17,10 @@ public interface StudentService {
     List<StudentDTO> filterStudentsByCgpa(double cgpa);
 
     StudentDTO getStudentById(Long id);
+
+    StudentDTO getMyProfile(String email);
+
+    StudentDTO updateMyProfile(String email, StudentProfileUpdateRequest profileUpdateRequest);
 
     StudentDTO updateStudent(Long id, StudentDTO studentDTO);
 

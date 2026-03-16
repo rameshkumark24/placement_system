@@ -22,7 +22,8 @@ public class Application {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private ApplicationStatus status;
     private LocalDate appliedDate;
 
     public Application() {
@@ -52,11 +53,11 @@ public class Application {
         this.company = company;
     }
 
-    public String getStatus() {
+    public ApplicationStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(ApplicationStatus status) {
         this.status = status;
     }
 

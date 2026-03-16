@@ -2,10 +2,12 @@ package com.rameshkumar.placementsystem.controller;
 
 import com.rameshkumar.placementsystem.dto.ApiResponse;
 import com.rameshkumar.placementsystem.dto.ApplicationDTO;
+import com.rameshkumar.placementsystem.dto.ApplicationStatusUpdateRequest;
 import com.rameshkumar.placementsystem.service.ApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -70,8 +72,31 @@ public class ApplicationController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
     })
     @GetMapping
-    public ApiResponse<List<ApplicationDTO>> getAllApplications() {
-        List<ApplicationDTO> applications = applicationService.getAllApplications();
+    public ApiResponse<List<ApplicationDTO>> getAllApplications(
+            @RequestParam(required = false) String company,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String studentEmail) {
+        List<ApplicationDTO> applications = applicationService.getAllApplications(company, status, studentEmail);
         return new ApiResponse<>(true, "All applications fetched successfully", applications);
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+            summary = "Update application status",
+            description = "Allows an ADMIN user to update an application status to APPLIED, SHORTLISTED, REJECTED, or SELECTED.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Application status updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid status or application id"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @PutMapping("/{applicationId}/status")
+    public ApiResponse<ApplicationDTO> updateApplicationStatus(
+            @PathVariable Long applicationId,
+            @Valid @RequestBody ApplicationStatusUpdateRequest request) {
+        ApplicationDTO updatedApplication = applicationService.updateApplicationStatus(applicationId, request);
+        return new ApiResponse<>(true, "Application status updated successfully", updatedApplication);
     }
 }

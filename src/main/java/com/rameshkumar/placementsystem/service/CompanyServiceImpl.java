@@ -58,6 +58,25 @@ public class CompanyServiceImpl implements CompanyService {
     }
 
     @Override
+    public CompanyDTO updateCompany(Long id, CompanyDTO companyDTO) {
+        Company existingCompany = companyRepository.findById(id)
+                .orElseThrow(() -> {
+                    logger.warn("Company not found for update with id {}", id);
+                    return new CompanyNotFoundException("Company not found with id: " + id);
+                });
+
+        existingCompany.setName(companyDTO.getName());
+        existingCompany.setRole(companyDTO.getRole());
+        existingCompany.setPackageOffered(companyDTO.getPackageOffered());
+        existingCompany.setEligibilityCgpa(companyDTO.getEligibilityCgpa());
+        existingCompany.setDeadline(companyDTO.getDeadline());
+
+        Company updatedCompany = companyRepository.save(existingCompany);
+        logger.info("Company updated with id {}", id);
+        return mapToDTO(updatedCompany);
+    }
+
+    @Override
     public void deleteCompany(Long id) {
         if (!companyRepository.existsById(id)) {
             logger.warn("Company not found for delete with id {}", id);

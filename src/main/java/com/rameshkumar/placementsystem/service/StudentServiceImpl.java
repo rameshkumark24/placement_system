@@ -2,6 +2,7 @@ package com.rameshkumar.placementsystem.service;
 
 import com.rameshkumar.placementsystem.dto.PaginationResponse;
 import com.rameshkumar.placementsystem.dto.StudentDTO;
+import com.rameshkumar.placementsystem.dto.StudentProfileUpdateRequest;
 import com.rameshkumar.placementsystem.entity.Student;
 import com.rameshkumar.placementsystem.entity.User;
 import com.rameshkumar.placementsystem.exception.StudentNotFoundException;
@@ -114,6 +115,42 @@ public class StudentServiceImpl implements StudentService {
 
         logger.info("Fetched student with id {}", id);
         return mapToDTO(student);
+    }
+
+    @Override
+    public StudentDTO getMyProfile(String email) {
+        Student student = studentRepository.findByUserEmail(email)
+                .orElseThrow(() -> {
+                    logger.warn("Student profile not found for email {}", email);
+                    return new RuntimeException("Student profile not found");
+                });
+        logger.info("Fetched student profile for {}", email);
+        return mapToDTO(student);
+    }
+
+    @Override
+    public StudentDTO updateMyProfile(String email, StudentProfileUpdateRequest profileUpdateRequest) {
+        Student student = studentRepository.findByUserEmail(email)
+                .orElseThrow(() -> {
+                    logger.warn("Student profile not found for self-update email {}", email);
+                    return new RuntimeException("Student profile not found");
+                });
+
+        User user = student.getUser();
+        if (user == null) {
+            throw new RuntimeException("Student profile is not linked to a user");
+        }
+
+        user.setName(profileUpdateRequest.getName());
+        userRepository.save(user);
+
+        student.setCgpa(profileUpdateRequest.getCgpa());
+        student.setSkills(profileUpdateRequest.getSkills());
+        student.setResumeLink(profileUpdateRequest.getResumeLink());
+
+        Student updatedStudent = studentRepository.save(student);
+        logger.info("Student self-profile updated for {}", email);
+        return mapToDTO(updatedStudent);
     }
 
     @Override

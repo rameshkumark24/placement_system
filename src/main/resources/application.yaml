@@ -2,19 +2,23 @@ spring:
   application:
     name: placement-system
   datasource:
-    url: jdbc:mysql://localhost:3306/placement_db
-    username: root
-    password: Sivakannan@52
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/placement_db}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:Sivakannan@52}
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
 
 jwt:
-  secret: placementSystemJwtSecretKey2026SecureKey123!
-  expiration-ms: 1800000
+  secret: ${JWT_SECRET:placementSystemJwtSecretKey2026SecureKey123!}
+  expiration-ms: ${JWT_EXPIRATION_MS:1800000}
 
 rate-limit:
-  capacity: 20
-  refill-tokens: 20
-  refill-duration-minutes: 1
+  capacity: ${RATE_LIMIT_CAPACITY:20}
+  refill-tokens: ${RATE_LIMIT_REFILL_TOKENS:20}
+  refill-duration-minutes: ${RATE_LIMIT_REFILL_DURATION_MINUTES:1}
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1}

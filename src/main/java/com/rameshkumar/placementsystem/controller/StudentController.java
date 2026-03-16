@@ -3,6 +3,7 @@ package com.rameshkumar.placementsystem.controller;
 import com.rameshkumar.placementsystem.dto.ApiResponse;
 import com.rameshkumar.placementsystem.dto.PaginationResponse;
 import com.rameshkumar.placementsystem.dto.StudentDTO;
+import com.rameshkumar.placementsystem.dto.StudentProfileUpdateRequest;
 import com.rameshkumar.placementsystem.service.StudentService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 
 @Tag(name = "Student APIs", description = "Operations related to student management")
@@ -100,6 +102,44 @@ public class StudentController {
                 "Student fetched successfully",
                 student
         );
+    }
+
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(
+            summary = "Get current student profile",
+            description = "Returns the profile of the currently authenticated student.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student profile fetched successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Student profile not found")
+    })
+    @GetMapping("/me")
+    public ApiResponse<StudentDTO> getMyProfile(Principal principal) {
+        StudentDTO student = studentService.getMyProfile(principal.getName());
+        return new ApiResponse<>(true, "Student profile fetched successfully", student);
+    }
+
+    @PreAuthorize("hasRole('STUDENT')")
+    @Operation(
+            summary = "Update current student profile",
+            description = "Allows the authenticated student to complete and update their own profile.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student profile updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
+    @PutMapping("/me")
+    public ApiResponse<StudentDTO> updateMyProfile(
+            Principal principal,
+            @Valid @RequestBody StudentProfileUpdateRequest profileUpdateRequest) {
+        StudentDTO updatedStudent = studentService.updateMyProfile(principal.getName(), profileUpdateRequest);
+        return new ApiResponse<>(true, "Student profile updated successfully", updatedStudent);
     }
 
     // UPDATE STUDENT
