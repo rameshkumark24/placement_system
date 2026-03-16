@@ -13,3 +13,8 @@ spring:
 jwt:
   secret: placementSystemJwtSecretKey2026SecureKey123!
   expiration-ms: 1800000
+
+rate-limit:
+  capacity: 20
+  refill-tokens: 20
+  refill-duration-minutes: 1

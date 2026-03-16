@@ -7,6 +7,7 @@ import com.rameshkumar.placementsystem.service.StudentService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import jakarta.validation.Valid;
 
@@ -28,7 +29,17 @@ public class StudentController {
 
     // CREATE STUDENT
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create a new student")
+    @Operation(
+            summary = "Create a new student",
+            description = "Creates a student record. Accessible only to ADMIN users.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student created successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
     @PostMapping
     public ApiResponse<StudentDTO> createStudent(@Valid @RequestBody StudentDTO studentDTO) {
 
@@ -43,11 +54,23 @@ public class StudentController {
 
     // GET ALL STUDENTS
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get all students")
+    @Operation(
+            summary = "Get all students",
+            description = "Returns the full student list. Accessible only to ADMIN users.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Students fetched successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden")
+    })
     @GetMapping
-    public ApiResponse<List<StudentDTO>> getAllStudents() {
+    public ApiResponse<List<StudentDTO>> getAllStudents(
+            @RequestParam(required = false) Double cgpa) {
 
-        List<StudentDTO> students = studentService.getAllStudents();
+        List<StudentDTO> students = cgpa != null
+                ? studentService.filterStudentsByCgpa(cgpa)
+                : studentService.getAllStudents();
 
         return new ApiResponse<>(
                 true,
@@ -57,7 +80,16 @@ public class StudentController {
     }
 
     // GET STUDENT BY ID
-    @Operation(summary = "Get student by ID")
+    @Operation(
+            summary = "Get student by ID",
+            description = "Returns a single student by id.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student fetched successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Student not found")
+    })
     @GetMapping("/{id}")
     public ApiResponse<StudentDTO> getStudentById(@PathVariable Long id){
 
@@ -72,7 +104,18 @@ public class StudentController {
 
     // UPDATE STUDENT
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Update student details")
+    @Operation(
+            summary = "Update student details",
+            description = "Updates an existing student record. Accessible only to ADMIN users.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student updated successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Student not found")
+    })
     @PutMapping("/{id}")
     public ApiResponse<StudentDTO> updateStudent(
             @PathVariable Long id,
@@ -89,7 +132,17 @@ public class StudentController {
 
     // DELETE STUDENT
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete student by ID")
+    @Operation(
+            summary = "Delete student by ID",
+            description = "Deletes a student record by id. Accessible only to ADMIN users.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Student deleted successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Student not found")
+    })
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteStudent(@PathVariable Long id) {
 
@@ -103,7 +156,15 @@ public class StudentController {
     }
 
     // PAGINATION
-    @Operation(summary = "Get students with pagination")
+    @Operation(
+            summary = "Get students with pagination",
+            description = "Returns students in paginated format.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Students fetched with pagination"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
     @GetMapping("/paginated")
     public ApiResponse<PaginationResponse<StudentDTO>> getStudentsPaginated(
             @RequestParam int page,
@@ -117,5 +178,20 @@ public class StudentController {
                 "Students fetched with pagination",
                 response
         );
+    }
+
+    @Operation(
+            summary = "Search students by skill",
+            description = "Returns students whose skills contain the provided keyword.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Students filtered by skill successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    @GetMapping("/search")
+    public ApiResponse<List<StudentDTO>> searchStudentsBySkill(@RequestParam String skill) {
+        List<StudentDTO> students = studentService.searchStudentsBySkill(skill);
+        return new ApiResponse<>(true, "Students filtered by skill successfully", students);
     }
 }

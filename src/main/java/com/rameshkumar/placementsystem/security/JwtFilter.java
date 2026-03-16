@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,6 +23,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
@@ -52,9 +56,11 @@ public class JwtFilter extends OncePerRequestFilter {
                 username = jwtUtil.extractUsername(jwt);
                 role = jwtUtil.extractRole(jwt);
             } catch (ExpiredJwtException ex) {
+                logger.warn("Expired JWT received for request {}", request.getRequestURI());
                 writeUnauthorizedResponse(response, "JWT token has expired");
                 return;
             } catch (JwtException | IllegalArgumentException ex) {
+                logger.warn("Invalid JWT received for request {}", request.getRequestURI());
                 writeUnauthorizedResponse(response, "Invalid JWT token");
                 return;
             }
@@ -76,6 +82,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                logger.info("Authenticated user {} with role {} for request {}", username, role, request.getRequestURI());
             }
         }
 
