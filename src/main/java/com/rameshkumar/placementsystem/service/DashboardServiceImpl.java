@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class DashboardServiceImpl implements DashboardService {
 
     private static final Logger logger = LoggerFactory.getLogger(DashboardServiceImpl.class);
+    private static final String STUDENT_ROLE = "STUDENT";
 
     private final StudentRepository studentRepository;
     private final CompanyRepository companyRepository;
@@ -30,7 +31,7 @@ public class DashboardServiceImpl implements DashboardService {
     public DashboardStatsDTO getAdminStats() {
         logger.info("Fetching admin dashboard statistics");
         return new DashboardStatsDTO(
-                studentRepository.count(),
+                studentRepository.countByUserRole(STUDENT_ROLE),
                 companyRepository.count(),
                 applicationRepository.count(),
                 applicationRepository.countByStatus(ApplicationStatus.SHORTLISTED),

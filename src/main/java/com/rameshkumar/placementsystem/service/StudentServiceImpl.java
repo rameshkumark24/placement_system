@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentServiceImpl implements StudentService {
 
     private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
+    private static final String STUDENT_ROLE = "STUDENT";
 
     private final ApplicationRepository applicationRepository;
     private final StudentRepository studentRepository;
@@ -86,7 +87,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<StudentDTO> getAllStudents() {
         logger.info("Fetching all students");
-        return studentRepository.findAll()
+        return studentRepository.findByUserRole(STUDENT_ROLE)
                 .stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -99,7 +100,7 @@ public class StudentServiceImpl implements StudentService {
 
         if (hasSkill && hasCgpa) {
             logger.info("Filtering students by skill {} and minimum CGPA {}", skill, cgpa);
-            return studentRepository.findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(skill, cgpa)
+            return studentRepository.findByUserRoleAndSkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(STUDENT_ROLE, skill, cgpa)
                     .stream()
                     .map(this::mapToDTO)
                     .toList();
@@ -119,7 +120,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<StudentDTO> searchStudentsBySkill(String skill) {
         logger.info("Searching students by skill {}", skill);
-        return studentRepository.findBySkillsContainingIgnoreCase(skill)
+        return studentRepository.findByUserRoleAndSkillsContainingIgnoreCase(STUDENT_ROLE, skill)
                 .stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -128,7 +129,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<StudentDTO> filterStudentsByCgpa(double cgpa) {
         logger.info("Filtering students with CGPA greater than or equal to {}", cgpa);
-        return studentRepository.findByCgpaGreaterThanEqual(cgpa)
+        return studentRepository.findByUserRoleAndCgpaGreaterThanEqual(STUDENT_ROLE, cgpa)
                 .stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -236,7 +237,7 @@ public class StudentServiceImpl implements StudentService {
         logger.info("Fetching students with pagination page {} and size {}", page, size);
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Student> studentPage = studentRepository.findAll(pageable);
+        Page<Student> studentPage = studentRepository.findByUserRole(STUDENT_ROLE, pageable);
 
         List<StudentDTO> studentDTOList = studentPage.getContent()
                 .stream()

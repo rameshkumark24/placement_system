@@ -31,7 +31,7 @@ class DashboardServiceImplTest {
 
     @Test
     void getAdminStatsAggregatesCountsFromRepositories() {
-        when(studentRepository.count()).thenReturn(18L);
+        when(studentRepository.countByUserRole("STUDENT")).thenReturn(18L);
         when(companyRepository.count()).thenReturn(6L);
         when(applicationRepository.count()).thenReturn(24L);
         when(applicationRepository.countByStatus(ApplicationStatus.SHORTLISTED)).thenReturn(5L);

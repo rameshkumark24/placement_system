@@ -52,14 +52,14 @@ class StudentServiceImplTest {
         student.setCgpa(8.8);
         student.setSkills("Java, Spring Boot");
 
-        when(studentRepository.findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(eq("Java"), eq(8.0)))
+        when(studentRepository.findByUserRoleAndSkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(eq("STUDENT"), eq("Java"), eq(8.0)))
                 .thenReturn(List.of(student));
 
         List<StudentDTO> result = studentService.filterStudents("Java", 8.0);
 
         assertEquals(1, result.size());
         assertEquals("student@example.com", result.get(0).getEmail());
-        verify(studentRepository).findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual("Java", 8.0);
+        verify(studentRepository).findByUserRoleAndSkillsContainingIgnoreCaseAndCgpaGreaterThanEqual("STUDENT", "Java", 8.0);
     }
 
     @Test
