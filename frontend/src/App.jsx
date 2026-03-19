@@ -55,6 +55,20 @@ async function apiRequest(path, method = "GET", body, token) {
   return payload.data;
 }
 
+function buildSession(authResponse) {
+  const user = parseJwt(authResponse.token);
+  if (!user) {
+    throw new Error("Received invalid access token");
+  }
+
+  return {
+    token: authResponse.token,
+    refreshToken: authResponse.refreshToken,
+    expiresInMs: authResponse.expiresInMs,
+    user
+  };
+}
+
 const emptyStudentForm = {
   name: "",
   email: "",
@@ -140,6 +154,46 @@ export default function App() {
     void refreshData();
   }, [session?.token]);
 
+  async function refreshSessionTokens(currentSession) {
+    if (!currentSession?.refreshToken) {
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+
+    try {
+      const data = await apiRequest("/auth/refresh", "POST", {
+        refreshToken: currentSession.refreshToken
+      });
+      const updatedSession = buildSession(data);
+      setSession(updatedSession);
+      return updatedSession;
+    } catch {
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+  }
+
+  async function authorizedRequest(path, method = "GET", body, attemptRefresh = true) {
+    const activeSession = session || readSession();
+    const accessToken = activeSession?.token;
+
+    try {
+      return await apiRequest(path, method, body, accessToken);
+    } catch (error) {
+      const shouldRefresh = attemptRefresh
+        && activeSession?.refreshToken
+        && error.message === "JWT token has expired";
+
+      if (!shouldRefresh) {
+        if (error.message === "JWT token has expired" || error.message === "Invalid JWT token") {
+          logout("Your session has expired. Please sign in again.");
+        }
+        throw error;
+      }
+
+      const updatedSession = await refreshSessionTokens(activeSession);
+      return apiRequest(path, method, body, updatedSession.token);
+    }
+  }
+
   async function refreshData() {
     if (!session?.token) {
       return;
@@ -149,12 +203,12 @@ export default function App() {
     try {
       if (isAdmin) {
         const [studentData, companyData, applicationData] = await Promise.all([
-          apiRequest(buildStudentQuery(), "GET", undefined, session.token),
-          apiRequest(buildCompanyQuery(), "GET", undefined, session.token),
-          apiRequest(buildApplicationQuery(), "GET", undefined, session.token)
+          authorizedRequest(buildStudentQuery()),
+          authorizedRequest(buildCompanyQuery()),
+          authorizedRequest(buildApplicationQuery())
         ]);
 
-        const statsData = await apiRequest("/dashboard/stats", "GET", undefined, session.token);
+        const statsData = await authorizedRequest("/dashboard/stats");
 
         setStudents(studentData || []);
         setCompanies(companyData || []);
@@ -162,9 +216,9 @@ export default function App() {
         setDashboardStats(statsData);
       } else {
         const [companyData, applicationData, profileData] = await Promise.all([
-          apiRequest(buildCompanyQuery(), "GET", undefined, session.token),
-          apiRequest("/applications/my", "GET", undefined, session.token),
-          apiRequest("/students/me", "GET", undefined, session.token)
+          authorizedRequest(buildCompanyQuery()),
+          authorizedRequest("/applications/my"),
+          authorizedRequest("/students/me")
         ]);
 
         setCompanies(companyData || []);
@@ -184,13 +238,15 @@ export default function App() {
   }
 
   function buildStudentQuery() {
+    const params = new URLSearchParams();
     if (filters.studentSkill) {
-      return `/students/search?skill=${encodeURIComponent(filters.studentSkill)}`;
+      params.set("skill", filters.studentSkill);
     }
     if (filters.studentCgpa) {
-      return `/students?cgpa=${encodeURIComponent(filters.studentCgpa)}`;
+      params.set("cgpa", filters.studentCgpa);
     }
-    return "/students";
+    const queryString = params.toString();
+    return queryString ? `/students?${queryString}` : "/students";
   }
 
   function buildCompanyQuery() {
@@ -231,8 +287,7 @@ export default function App() {
           email: authForm.email,
           password: authForm.password
         });
-        const user = parseJwt(data.token);
-        setSession({ token: data.token, user });
+        setSession(buildSession(data));
         setPageState({ loading: false, error: "", notice: "Signed in successfully." });
       }
     } catch (error) {
@@ -245,10 +300,10 @@ export default function App() {
   async function handleCreateStudent(event) {
     event.preventDefault();
     await guardedAction(async () => {
-      await apiRequest("/students", "POST", {
+      await authorizedRequest("/students", "POST", {
         ...studentForm,
         cgpa: Number(studentForm.cgpa)
-      }, session.token);
+      });
       setStudentForm(emptyStudentForm);
       return "Student profile created.";
     });
@@ -264,9 +319,9 @@ export default function App() {
       };
 
       if (editingCompanyId) {
-        await apiRequest(`/companies/${editingCompanyId}`, "PUT", payload, session.token);
+        await authorizedRequest(`/companies/${editingCompanyId}`, "PUT", payload);
       } else {
-        await apiRequest("/companies", "POST", payload, session.token);
+        await authorizedRequest("/companies", "POST", payload);
       }
 
       setCompanyForm(emptyCompanyForm);
@@ -277,14 +332,14 @@ export default function App() {
 
   async function handleDeleteStudent(id) {
     await guardedAction(async () => {
-      await apiRequest(`/students/${id}`, "DELETE", undefined, session.token);
+      await authorizedRequest(`/students/${id}`, "DELETE");
       return "Student removed.";
     });
   }
 
   async function handleDeleteCompany(id) {
     await guardedAction(async () => {
-      await apiRequest(`/companies/${id}`, "DELETE", undefined, session.token);
+      await authorizedRequest(`/companies/${id}`, "DELETE");
       if (editingCompanyId === id) {
         setCompanyForm(emptyCompanyForm);
         setEditingCompanyId(null);
@@ -311,7 +366,7 @@ export default function App() {
 
   async function handleApply(companyId) {
     await guardedAction(async () => {
-      await apiRequest(`/applications/apply/${companyId}`, "POST", undefined, session.token);
+      await authorizedRequest(`/applications/apply/${companyId}`, "POST");
       setApplyCompanyId("");
       return "Application submitted.";
     });
@@ -320,19 +375,19 @@ export default function App() {
   async function handleUpdateProfile(event) {
     event.preventDefault();
     await guardedAction(async () => {
-      await apiRequest("/students/me", "PUT", {
+      await authorizedRequest("/students/me", "PUT", {
         name: profileForm.name,
         cgpa: Number(profileForm.cgpa),
         skills: profileForm.skills,
         resumeLink: profileForm.resumeLink
-      }, session.token);
+      });
       return "Profile updated successfully.";
     });
   }
 
   async function handleUpdateApplicationStatus(applicationId, status) {
     await guardedAction(async () => {
-      await apiRequest(`/applications/${applicationId}/status`, "PUT", { status }, session.token);
+      await authorizedRequest(`/applications/${applicationId}/status`, "PUT", { status });
       return "Application status updated.";
     });
   }
@@ -348,14 +403,14 @@ export default function App() {
     }
   }
 
-  function logout() {
+  function logout(notice = "You have been signed out.") {
     setSession(null);
     setStudents([]);
     setCompanies([]);
     setApplications([]);
     setDashboardStats(null);
     setProfileForm(emptyProfileForm);
-    setPageState({ loading: false, error: "", notice: "You have been signed out." });
+    setPageState({ loading: false, error: "", notice });
   }
 
   if (!session?.token) {
@@ -503,12 +558,12 @@ export default function App() {
               </form>
             </Panel>
 
-            <Panel title="Student Directory" subtitle="Search by skill or filter by minimum CGPA.">
-              <div className="toolbar">
-                <FormInput label="Skill Search" value={filters.studentSkill} onChange={(value) => setFilters({ ...filters, studentSkill: value, studentCgpa: "" })} />
-                <FormInput label="Min CGPA" type="number" value={filters.studentCgpa} onChange={(value) => setFilters({ ...filters, studentCgpa: value, studentSkill: "" })} />
+              <Panel title="Student Directory" subtitle="Search by skill or filter by minimum CGPA.">
+                <div className="toolbar">
+                <FormInput label="Skill Search" value={filters.studentSkill} onChange={(value) => setFilters({ ...filters, studentSkill: value })} />
+                <FormInput label="Min CGPA" type="number" value={filters.studentCgpa} onChange={(value) => setFilters({ ...filters, studentCgpa: value })} />
                 <button className="ghost-button" onClick={() => refreshData()}>Refresh</button>
-              </div>
+                </div>
               <DataTable
                 columns={["Name", "Email", "CGPA", "Skills", "Actions"]}
                 rows={students.map((student) => [

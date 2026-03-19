@@ -1,6 +1,7 @@
 package com.rameshkumar.placementsystem.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -8,8 +9,10 @@ import com.rameshkumar.placementsystem.dto.StudentDTO;
 import com.rameshkumar.placementsystem.dto.StudentProfileUpdateRequest;
 import com.rameshkumar.placementsystem.entity.Student;
 import com.rameshkumar.placementsystem.entity.User;
+import com.rameshkumar.placementsystem.repository.ApplicationRepository;
 import com.rameshkumar.placementsystem.repository.StudentRepository;
 import com.rameshkumar.placementsystem.repository.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +25,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class StudentServiceImplTest {
 
     @Mock
+    private ApplicationRepository applicationRepository;
+
+    @Mock
     private StudentRepository studentRepository;
 
     @Mock
@@ -32,6 +38,47 @@ class StudentServiceImplTest {
 
     @InjectMocks
     private StudentServiceImpl studentService;
+
+    @Test
+    void filterStudentsUsesCombinedSearchWhenSkillAndCgpaAreProvided() {
+        User user = new User();
+        user.setId(14L);
+        user.setName("Ramesh");
+        user.setEmail("student@example.com");
+
+        Student student = new Student();
+        student.setId(8L);
+        student.setUser(user);
+        student.setCgpa(8.8);
+        student.setSkills("Java, Spring Boot");
+
+        when(studentRepository.findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(eq("Java"), eq(8.0)))
+                .thenReturn(List.of(student));
+
+        List<StudentDTO> result = studentService.filterStudents("Java", 8.0);
+
+        assertEquals(1, result.size());
+        assertEquals("student@example.com", result.get(0).getEmail());
+        verify(studentRepository).findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual("Java", 8.0);
+    }
+
+    @Test
+    void deleteStudentRemovesApplicationsBeforeStudentAndUser() {
+        User user = new User();
+        user.setId(14L);
+
+        Student student = new Student();
+        student.setId(8L);
+        student.setUser(user);
+
+        when(studentRepository.findById(8L)).thenReturn(Optional.of(student));
+
+        studentService.deleteStudent(8L);
+
+        verify(applicationRepository).deleteByStudentId(8L);
+        verify(studentRepository).delete(student);
+        verify(userRepository).deleteById(14L);
+    }
 
     @Test
     void updateMyProfileUpdatesAllowedFields() {

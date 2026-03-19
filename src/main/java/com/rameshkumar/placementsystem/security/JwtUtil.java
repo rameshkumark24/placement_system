@@ -17,21 +17,36 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
+    private static final String ROLE_CLAIM = "role";
+    private static final String TOKEN_TYPE_CLAIM = "tokenType";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     private final String secretKey;
-    private final long expirationMs;
+    private final long accessTokenExpirationMs;
+    private final long refreshTokenExpirationMs;
 
     public JwtUtil(
             @Value("${jwt.secret}") String secretKey,
-            @Value("${jwt.expiration-ms:1800000}") long expirationMs) {
+            @Value("${jwt.expiration-ms:1800000}") long accessTokenExpirationMs,
+            @Value("${jwt.refresh-expiration-ms:604800000}") long refreshTokenExpirationMs) {
         this.secretKey = secretKey;
-        this.expirationMs = expirationMs;
+        this.accessTokenExpirationMs = accessTokenExpirationMs;
+        this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
-    // GENERATE TOKEN WITH ROLE
-    public String generateToken(String username, String role) {
+    public String generateAccessToken(String username, String role) {
+        return generateToken(username, role, ACCESS_TOKEN_TYPE, accessTokenExpirationMs);
+    }
 
+    public String generateRefreshToken(String username, String role) {
+        return generateToken(username, role, REFRESH_TOKEN_TYPE, refreshTokenExpirationMs);
+    }
+
+    private String generateToken(String username, String role, String tokenType, long expirationMs) {
         Map<String, Object> claims = new HashMap<>();
-        claims.put("role", role);
+        claims.put(ROLE_CLAIM, role);
+        claims.put(TOKEN_TYPE_CLAIM, tokenType);
 
         Date issuedAt = new Date();
         Date expiryDate = new Date(issuedAt.getTime() + expirationMs);
@@ -52,7 +67,11 @@ public class JwtUtil {
 
     // EXTRACT ROLE
     public String extractRole(String token) {
-        return extractAllClaims(token).get("role", String.class);
+        return extractAllClaims(token).get(ROLE_CLAIM, String.class);
+    }
+
+    public String extractTokenType(String token) {
+        return extractAllClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
     }
 
     public Date extractExpiration(String token) {
@@ -78,7 +97,17 @@ public class JwtUtil {
 
     public Boolean validateToken(String token, String username) {
         String extractedUsername = extractUsername(token);
-        return extractedUsername.equals(username) && !isTokenExpired(token);
+        return extractedUsername.equals(username)
+                && !isTokenExpired(token)
+                && ACCESS_TOKEN_TYPE.equals(extractTokenType(token));
+    }
+
+    public Boolean validateRefreshToken(String token) {
+        return !isTokenExpired(token) && REFRESH_TOKEN_TYPE.equals(extractTokenType(token));
+    }
+
+    public long getAccessTokenExpirationMs() {
+        return accessTokenExpirationMs;
     }
 
     private Key getSigningKey() {

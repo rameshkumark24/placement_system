@@ -3,6 +3,7 @@ package com.rameshkumar.placementsystem.controller;
 import com.rameshkumar.placementsystem.dto.ApiResponse;
 import com.rameshkumar.placementsystem.dto.AuthResponse;
 import com.rameshkumar.placementsystem.dto.LoginRequest;
+import com.rameshkumar.placementsystem.dto.RefreshTokenRequest;
 import com.rameshkumar.placementsystem.dto.RegisterRequest;
 import com.rameshkumar.placementsystem.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,5 +43,16 @@ public class AuthController {
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request){
         AuthResponse authResponse = authService.login(request);
         return new ApiResponse<>(true, "Login successful", authResponse);
+    }
+
+    @Operation(summary = "Refresh JWT tokens", description = "Validates a refresh token and returns a new access token and rotated refresh token.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token refresh successful"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid refresh token")
+    })
+    @PostMapping("/refresh")
+    public ApiResponse<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthResponse authResponse = authService.refreshToken(request.getRefreshToken());
+        return new ApiResponse<>(true, "Token refresh successful", authResponse);
     }
 }

@@ -68,11 +68,10 @@ public class StudentController {
     })
     @GetMapping
     public ApiResponse<List<StudentDTO>> getAllStudents(
+            @RequestParam(required = false) String skill,
             @RequestParam(required = false) Double cgpa) {
 
-        List<StudentDTO> students = cgpa != null
-                ? studentService.filterStudentsByCgpa(cgpa)
-                : studentService.getAllStudents();
+        List<StudentDTO> students = studentService.filterStudents(skill, cgpa);
 
         return new ApiResponse<>(
                 true,

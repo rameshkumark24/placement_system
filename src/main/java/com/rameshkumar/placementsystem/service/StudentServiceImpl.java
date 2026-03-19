@@ -6,6 +6,7 @@ import com.rameshkumar.placementsystem.dto.StudentProfileUpdateRequest;
 import com.rameshkumar.placementsystem.entity.Student;
 import com.rameshkumar.placementsystem.entity.User;
 import com.rameshkumar.placementsystem.exception.StudentNotFoundException;
+import com.rameshkumar.placementsystem.repository.ApplicationRepository;
 import com.rameshkumar.placementsystem.repository.StudentRepository;
 import com.rameshkumar.placementsystem.repository.UserRepository;
 import java.util.List;
@@ -16,19 +17,23 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StudentServiceImpl implements StudentService {
 
     private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
 
+    private final ApplicationRepository applicationRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public StudentServiceImpl(StudentRepository studentRepository,
+    public StudentServiceImpl(ApplicationRepository applicationRepository,
+                              StudentRepository studentRepository,
                               UserRepository userRepository,
                               PasswordEncoder passwordEncoder) {
+        this.applicationRepository = applicationRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -85,6 +90,30 @@ public class StudentServiceImpl implements StudentService {
                 .stream()
                 .map(this::mapToDTO)
                 .toList();
+    }
+
+    @Override
+    public List<StudentDTO> filterStudents(String skill, Double cgpa) {
+        boolean hasSkill = skill != null && !skill.isBlank();
+        boolean hasCgpa = cgpa != null;
+
+        if (hasSkill && hasCgpa) {
+            logger.info("Filtering students by skill {} and minimum CGPA {}", skill, cgpa);
+            return studentRepository.findBySkillsContainingIgnoreCaseAndCgpaGreaterThanEqual(skill, cgpa)
+                    .stream()
+                    .map(this::mapToDTO)
+                    .toList();
+        }
+
+        if (hasSkill) {
+            return searchStudentsBySkill(skill);
+        }
+
+        if (hasCgpa) {
+            return filterStudentsByCgpa(cgpa);
+        }
+
+        return getAllStudents();
     }
 
     @Override
@@ -185,6 +214,7 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
+    @Transactional
     public void deleteStudent(Long id) {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> {
@@ -193,6 +223,7 @@ public class StudentServiceImpl implements StudentService {
                 });
 
         Long userId = student.getUser() != null ? student.getUser().getId() : null;
+        applicationRepository.deleteByStudentId(id);
         studentRepository.delete(student);
         if (userId != null) {
             userRepository.deleteById(userId);

@@ -73,8 +73,29 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Invalid email or password");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
+        String token = jwtUtil.generateAccessToken(user.getEmail(), user.getRole());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getRole());
         logger.info("User logged in successfully with email {} and role {}", user.getEmail(), user.getRole());
-        return new AuthResponse(token);
+        return new AuthResponse(token, refreshToken, jwtUtil.getAccessTokenExpirationMs());
+    }
+
+    @Override
+    public AuthResponse refreshToken(String refreshToken) {
+        if (!jwtUtil.validateRefreshToken(refreshToken)) {
+            logger.warn("Refresh token validation failed");
+            throw new RuntimeException("Invalid refresh token");
+        }
+
+        String email = jwtUtil.extractUsername(refreshToken);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    logger.warn("Refresh token user not found for email {}", email);
+                    return new RuntimeException("Invalid refresh token");
+                });
+
+        String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getRole());
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getRole());
+        logger.info("Refreshed tokens for email {}", user.getEmail());
+        return new AuthResponse(newAccessToken, newRefreshToken, jwtUtil.getAccessTokenExpirationMs());
     }
 }

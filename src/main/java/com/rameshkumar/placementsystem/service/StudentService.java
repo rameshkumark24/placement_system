@@ -12,6 +12,8 @@ public interface StudentService {
 
     List<StudentDTO> getAllStudents();
 
+    List<StudentDTO> filterStudents(String skill, Double cgpa);
+
     List<StudentDTO> searchStudentsBySkill(String skill);
 
     List<StudentDTO> filterStudentsByCgpa(double cgpa);

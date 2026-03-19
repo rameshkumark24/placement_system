@@ -4,6 +4,7 @@ import com.rameshkumar.placementsystem.entity.Application;
 import com.rameshkumar.placementsystem.entity.ApplicationStatus;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface ApplicationRepository extends JpaRepository<Application, Long> {
 
@@ -30,4 +31,7 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     long countByStatus(ApplicationStatus status);
 
     boolean existsByStudentIdAndCompanyId(Long studentId, Long companyId);
+
+    @Transactional
+    void deleteByStudentId(Long studentId);
 }
