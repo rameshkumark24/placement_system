@@ -35,3 +35,11 @@ build/
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+
+### Environment files (keep secrets out of git) ###
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
