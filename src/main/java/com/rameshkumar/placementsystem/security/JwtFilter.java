@@ -1,7 +1,6 @@
 package com.rameshkumar.placementsystem.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rameshkumar.placementsystem.dto.ApiResponse;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -16,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -27,15 +25,21 @@ public class JwtFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
-    private final ObjectMapper objectMapper;
+    private final JsonSecurityErrorHandler securityErrorHandler;
 
-    public JwtFilter(JwtUtil jwtUtil,
-                     UserDetailsService userDetailsService,
-                     ObjectMapper objectMapper) {
+    public JwtFilter(JwtUtil jwtUtil, JsonSecurityErrorHandler securityErrorHandler) {
         this.jwtUtil = jwtUtil;
-        this.userDetailsService = userDetailsService;
-        this.objectMapper = objectMapper;
+        this.securityErrorHandler = securityErrorHandler;
+    }
+
+    // Public endpoints must keep working even if the browser still holds a stale token.
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return "OPTIONS".equalsIgnoreCase(request.getMethod())
+                || PublicEndpoints.isHealthPath(path)
+                || PublicEndpoints.isDocsPath(path)
+                || PublicEndpoints.isAuthPath(path);
     }
 
     @Override
@@ -46,56 +50,49 @@ public class JwtFilter extends OncePerRequestFilter {
 
         final String authHeader = request.getHeader("Authorization");
 
-        String jwt = null;
-        String username = null;
-        String role = null;
-
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            try {
-                jwt = authHeader.substring(7);
-                username = jwtUtil.extractUsername(jwt);
-                role = jwtUtil.extractRole(jwt);
-            } catch (ExpiredJwtException ex) {
-                logger.warn("Expired JWT received for request {}", request.getRequestURI());
-                writeUnauthorizedResponse(response, "JWT token has expired");
-                return;
-            } catch (JwtException | IllegalArgumentException ex) {
-                logger.warn("Invalid JWT received for request {}", request.getRequestURI());
-                writeUnauthorizedResponse(response, "Invalid JWT token");
-                return;
-            }
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        Claims claims;
+        try {
+            claims = jwtUtil.parseClaims(authHeader.substring(7));
+        } catch (ExpiredJwtException ex) {
+            logger.debug("Expired JWT received for request {}", request.getRequestURI());
+            securityErrorHandler.write(response, HttpServletResponse.SC_UNAUTHORIZED, "JWT token has expired");
+            return;
+        } catch (JwtException | IllegalArgumentException ex) {
+            logger.warn("Invalid JWT received for request {}", request.getRequestURI());
+            securityErrorHandler.write(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+            return;
+        }
 
-            if (jwtUtil.validateToken(jwt, username)) {
+        // A refresh token must never be usable as an access token.
+        if (!jwtUtil.isAccessToken(claims)) {
+            securityErrorHandler.write(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+            return;
+        }
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                username,
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
+        String username = claims.getSubject();
+        String role = jwtUtil.getRole(claims);
 
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
+        if (username != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            username,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    );
 
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-                logger.info("Authenticated user {} with role {} for request {}", username, role, request.getRequestURI());
-            }
+            authToken.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+            logger.debug("Authenticated user {} with role {} for request {}", username, role, request.getRequestURI());
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private void writeUnauthorizedResponse(HttpServletResponse response, String message)
-            throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(
-                objectMapper.writeValueAsString(new ApiResponse<>(false, message, null))
-        );
     }
 }

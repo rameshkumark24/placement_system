@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public class StudentDTO {
 
@@ -12,13 +13,16 @@ public class StudentDTO {
     private Long userId;
 
     @NotBlank(message = "Name cannot be empty")
+    @Size(max = 100, message = "Name must be at most 100 characters")
     private String name;
 
     @Email(message = "Email must be valid")
     @NotBlank(message = "Email cannot be empty")
+    @Size(max = 255, message = "Email must be at most 255 characters")
     private String email;
 
     @NotBlank(message = "Password cannot be empty")
+    @Size(min = 6, max = 72, message = "Password must be between 6 and 72 characters")
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
@@ -27,8 +31,10 @@ public class StudentDTO {
     private double cgpa;
 
     @NotBlank(message = "Skills cannot be empty")
+    @Size(max = 255, message = "Skills must be at most 255 characters")
     private String skills;
 
+    @Size(max = 255, message = "Resume link must be at most 255 characters")
     private String resumeLink;
 
     public StudentDTO() {
@@ -74,7 +80,7 @@ public class StudentDTO {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = email == null ? null : email.trim();
     }
 
     public String getPassword() {

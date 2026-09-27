@@ -5,6 +5,7 @@ spring:
     username: sa
     password:
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
     show-sql: false
@@ -14,8 +15,20 @@ jwt:
   expiration-ms: 1800000
   refresh-expiration-ms: 604800000
 
+# High limits so integration tests are never throttled; the limiter has its own dedicated test.
+rate-limit:
+  capacity: 10000
+  refill-tokens: 10000
+  refill-duration-minutes: 1
+  auth-capacity: 10000
+  auth-refill-duration-minutes: 1
+
 app:
   legacy-migration:
     enabled: false
   cors:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1
+  admin:
+    email: admin@placement.test
+    password: AdminPass123
+    name: Test Admin

@@ -14,6 +14,8 @@ import com.rameshkumar.placementsystem.entity.ApplicationStatus;
 import com.rameshkumar.placementsystem.entity.Company;
 import com.rameshkumar.placementsystem.entity.Student;
 import com.rameshkumar.placementsystem.entity.User;
+import com.rameshkumar.placementsystem.exception.BadRequestException;
+import com.rameshkumar.placementsystem.exception.ConflictException;
 import com.rameshkumar.placementsystem.repository.ApplicationRepository;
 import com.rameshkumar.placementsystem.repository.CompanyRepository;
 import com.rameshkumar.placementsystem.repository.StudentRepository;
@@ -120,5 +122,52 @@ class ApplicationServiceImplTest {
 
         assertEquals("Invalid application status: UNKNOWN", exception.getMessage());
         verify(applicationRepository, never()).save(any(Application.class));
+    }
+
+    @Test
+    void applyToCompanyRejectsStudentBelowEligibilityCgpa() {
+        student.setCgpa(6.5);
+        when(studentRepository.findByUserEmail("student@example.com")).thenReturn(Optional.of(student));
+        when(companyRepository.findById(3L)).thenReturn(Optional.of(company));
+
+        BadRequestException exception = assertThrows(BadRequestException.class,
+                () -> applicationService.applyToCompany("student@example.com", 3L));
+
+        assertEquals("Your CGPA (6.50) is below the minimum of 7.00 required by Acme", exception.getMessage());
+        verify(applicationRepository, never()).save(any());
+    }
+
+    @Test
+    void applyToCompanyRejectsApplicationsAfterDeadline() {
+        company.setDeadline(LocalDate.now().minusDays(1));
+        when(studentRepository.findByUserEmail("student@example.com")).thenReturn(Optional.of(student));
+        when(companyRepository.findById(3L)).thenReturn(Optional.of(company));
+
+        BadRequestException exception = assertThrows(BadRequestException.class,
+                () -> applicationService.applyToCompany("student@example.com", 3L));
+
+        assertEquals("The application deadline for Acme has passed", exception.getMessage());
+        verify(applicationRepository, never()).save(any());
+    }
+
+    @Test
+    void applyToCompanyTreatsPlaceholderSkillsAsIncompleteProfile() {
+        student.setSkills("Profile not updated");
+        when(studentRepository.findByUserEmail("student@example.com")).thenReturn(Optional.of(student));
+
+        assertThrows(BadRequestException.class,
+                () -> applicationService.applyToCompany("student@example.com", 3L));
+        verify(companyRepository, never()).findById(any());
+    }
+
+    @Test
+    void applyToCompanyRejectsDuplicateApplication() {
+        when(studentRepository.findByUserEmail("student@example.com")).thenReturn(Optional.of(student));
+        when(companyRepository.findById(3L)).thenReturn(Optional.of(company));
+        when(applicationRepository.existsByStudentIdAndCompanyId(7L, 3L)).thenReturn(true);
+
+        assertThrows(ConflictException.class,
+                () -> applicationService.applyToCompany("student@example.com", 3L));
+        verify(applicationRepository, never()).save(any());
     }
 }

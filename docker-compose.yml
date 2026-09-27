@@ -28,9 +28,11 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "true"
-      JWT_SECRET: placementSystemJwtSecretKey2026SecureKey123!
+      SPRING_JPA_SHOW_SQL: "${SPRING_JPA_SHOW_SQL:-false}"
+      JWT_SECRET: "${JWT_SECRET:-placementSystemJwtSecretKey2026SecureKey123!}"
       JWT_EXPIRATION_MS: 1800000
+      APP_ADMIN_EMAIL: "${APP_ADMIN_EMAIL:-admin@placement.local}"
+      APP_ADMIN_PASSWORD: "${APP_ADMIN_PASSWORD:-ChangeMe123!}"
       APP_CORS_ALLOWED_ORIGINS: http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "8080:8080"
@@ -42,6 +44,7 @@ services:
       args:
         VITE_API_BASE_URL: http://localhost:8080
     container_name: placement-frontend
+    # The frontend shows a "waking up" status and waits for the backend on its own.
     depends_on:
       - backend
     ports:

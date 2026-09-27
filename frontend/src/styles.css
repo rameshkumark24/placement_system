@@ -48,7 +48,7 @@ select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   background: rgba(255, 255, 255, 0.92);
 }
 
@@ -170,6 +170,10 @@ select {
 
 .card-form.compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card-form.compact > button {
+  align-self: end;
 }
 
 .card-form label,
@@ -371,6 +375,186 @@ th {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none !important;
+}
+
+a {
+  color: #1d4d73;
+}
+
+.muted {
+  color: rgba(17, 35, 30, 0.5);
+}
+
+.table-action.danger {
+  color: #8c2330;
+  background: rgba(217, 121, 124, 0.16);
+}
+
+.link-button {
+  padding: 0;
+  margin-left: 0.4rem;
+  background: none;
+  color: #1d4d73;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+/* Backend wake-up status */
+
+.server-status {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  background: rgba(17, 35, 30, 0.05);
+}
+
+.server-status p {
+  margin: 0.5rem 0 0;
+  font-size: 0.92rem;
+  color: rgba(17, 35, 30, 0.72);
+}
+
+.server-status-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.server-elapsed {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: rgba(17, 35, 30, 0.6);
+}
+
+.server-dot {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  flex: none;
+  background: rgba(17, 35, 30, 0.3);
+}
+
+.server-online .server-dot {
+  background: #3f9d74;
+}
+
+.server-checking .server-dot,
+.server-waking .server-dot {
+  background: var(--sun);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.server-offline .server-dot {
+  background: var(--rose);
+}
+
+.server-online.server-status {
+  background: rgba(123, 198, 164, 0.16);
+}
+
+.server-waking.server-status {
+  background: rgba(242, 161, 84, 0.16);
+}
+
+.server-offline.server-status {
+  background: rgba(217, 121, 124, 0.14);
+}
+
+.server-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: rgba(17, 35, 30, 0.68);
+}
+
+.progress-track {
+  display: block;
+  height: 6px;
+  margin-top: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(17, 35, 30, 0.08);
+}
+
+.progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sun);
+  transition: width 900ms linear;
+}
+
+.loading-bar {
+  height: 3px;
+  margin: -0.5rem 0 1rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--sky), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Student eligibility badges */
+
+.company-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.company-card .primary-button {
+  margin-top: auto;
+}
+
+.eligibility {
+  align-self: start;
+  margin-bottom: 0.8rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.eligibility-ok {
+  color: #1b5d44;
+  background: rgba(123, 198, 164, 0.22);
+}
+
+.eligibility-warn {
+  color: #5b4b1f;
+  background: rgba(242, 161, 84, 0.2);
+}
+
+.eligibility-closed {
+  color: #8c2330;
+  background: rgba(217, 121, 124, 0.16);
+}
+
+.eligibility-done {
+  color: #1d4d73;
+  background: rgba(126, 170, 216, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-dot,
+  .loading-bar {
+    animation: none !important;
+  }
 }
 
 @media (max-width: 960px) {

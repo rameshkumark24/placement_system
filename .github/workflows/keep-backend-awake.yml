@@ -1,0 +1,81 @@
+name: Keep Render backend awake
+
+# Render's free tier puts a web service to sleep after 15 minutes without traffic, and the next
+# visitor then waits for a cold start. Pinging /health every 10 minutes keeps it warm.
+#
+# Configuration (Settings -> Secrets and variables -> Actions -> Variables):
+#   BACKEND_URL   optional, e.g. https://placement-system-backend.onrender.com
+#   FRONTEND_URL  optional, used to auto-discover BACKEND_URL (defaults to the repo's website field)
+# If BACKEND_URL is not set, the backend URL is read from the deployed frontend's JavaScript bundle.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-backend-awake
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Resolve backend URL
+        id: resolve
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="${BACKEND_URL:-}"
+
+          if [ -z "$url" ]; then
+            frontend="${FRONTEND_URL:-}"
+            if [ -z "$frontend" ]; then
+              frontend=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY" | jq -r '.homepage // empty') || true
+            fi
+
+            if [ -n "$frontend" ]; then
+              frontend="${frontend%/}"
+              echo "Looking for the backend URL in $frontend"
+              assets=$(curl -fsSL --max-time 30 "$frontend/" | grep -oE '/assets/[^"]+\.js' | sort -u) || true
+              for asset in $assets; do
+                found=$(curl -fsSL --max-time 30 "$frontend$asset" | grep -oE 'https://[a-zA-Z0-9.-]+\.onrender\.com' | head -n1) || true
+                if [ -n "$found" ]; then
+                  url="$found"
+                  break
+                fi
+              done
+            fi
+          fi
+
+          if [ -z "$url" ]; then
+            echo "::notice::No backend URL found. Set the BACKEND_URL repository variable to enable keep-awake pings."
+          else
+            echo "Backend URL: ${url%/}"
+          fi
+          echo "url=${url%/}" >> "$GITHUB_OUTPUT"
+
+      - name: Ping /health
+        if: steps.resolve.outputs.url != ''
+        env:
+          URL: ${{ steps.resolve.outputs.url }}
+        run: |
+          # A cold start can take a minute or more, so allow long requests and several retries.
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 90 "$URL/health") || true
+            if [ "$code" -ge 200 ] 2>/dev/null && [ "$code" -lt 500 ]; then
+              echo "Backend responded with HTTP $code: $(head -c 300 /tmp/body)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP ${code:-000}. Retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::Backend at $URL did not respond after 6 attempts"
+          exit 1

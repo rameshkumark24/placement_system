@@ -6,13 +6,18 @@ import com.rameshkumar.placementsystem.entity.Application;
 import com.rameshkumar.placementsystem.entity.ApplicationStatus;
 import com.rameshkumar.placementsystem.entity.Company;
 import com.rameshkumar.placementsystem.entity.Student;
+import com.rameshkumar.placementsystem.entity.StudentProfileDefaults;
 import com.rameshkumar.placementsystem.entity.User;
+import com.rameshkumar.placementsystem.exception.BadRequestException;
 import com.rameshkumar.placementsystem.exception.CompanyNotFoundException;
+import com.rameshkumar.placementsystem.exception.ConflictException;
+import com.rameshkumar.placementsystem.exception.ResourceNotFoundException;
 import com.rameshkumar.placementsystem.repository.ApplicationRepository;
 import com.rameshkumar.placementsystem.repository.CompanyRepository;
 import com.rameshkumar.placementsystem.repository.StudentRepository;
 import com.rameshkumar.placementsystem.repository.UserRepository;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.util.StringUtils;
 import org.slf4j.Logger;
@@ -24,6 +29,11 @@ import org.springframework.stereotype.Service;
 public class ApplicationServiceImpl implements ApplicationService {
 
     private static final Logger logger = LoggerFactory.getLogger(ApplicationServiceImpl.class);
+
+    // Newest applications first.
+    private static final Comparator<Application> NEWEST_FIRST = Comparator
+            .comparing(Application::getAppliedDate, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(Application::getId, Comparator.nullsLast(Comparator.reverseOrder()));
 
     private final ApplicationRepository applicationRepository;
     private final StudentRepository studentRepository;
@@ -49,9 +59,11 @@ public class ApplicationServiceImpl implements ApplicationService {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new CompanyNotFoundException("Company not found with id: " + companyId));
 
+        validateEligibility(student, company);
+
         if (applicationRepository.existsByStudentIdAndCompanyId(student.getId(), companyId)) {
             logger.warn("Duplicate application attempt by student {} for company {}", studentEmail, companyId);
-            throw new RuntimeException("You have already applied to this company");
+            throw new ConflictException("You have already applied to this company");
         }
 
         Application application = new Application();
@@ -65,22 +77,27 @@ public class ApplicationServiceImpl implements ApplicationService {
         return mapToDTO(savedApplication);
     }
 
+    // Not read-only: a missing profile is created on first access.
     @Override
+    @Transactional
     public List<ApplicationDTO> getMyApplications(String studentEmail) {
         Student student = getOrCreateStudentProfile(studentEmail);
         logger.info("Fetching applications for student {}", studentEmail);
         return applicationRepository.findByStudentId(student.getId())
                 .stream()
+                .sorted(NEWEST_FIRST)
                 .map(this::mapToDTO)
                 .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ApplicationDTO> getAllApplications(String companyName, String status, String studentEmail) {
         logger.info("Fetching applications with filters company='{}', status='{}', studentEmail='{}'",
                 companyName, status, studentEmail);
         return findApplications(companyName, status, studentEmail)
                 .stream()
+                .sorted(NEWEST_FIRST)
                 .map(this::mapToDTO)
                 .toList();
     }
@@ -89,7 +106,7 @@ public class ApplicationServiceImpl implements ApplicationService {
     @Transactional
     public ApplicationDTO updateApplicationStatus(Long applicationId, ApplicationStatusUpdateRequest request) {
         Application application = applicationRepository.findById(applicationId)
-                .orElseThrow(() -> new RuntimeException("Application not found with id: " + applicationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found with id: " + applicationId));
 
         ApplicationStatus nextStatus = parseStatus(request.getStatus());
         application.setStatus(nextStatus);
@@ -104,29 +121,31 @@ public class ApplicationServiceImpl implements ApplicationService {
         boolean hasStatus = StringUtils.hasText(status);
         boolean hasStudentEmail = StringUtils.hasText(studentEmail);
         ApplicationStatus parsedStatus = hasStatus ? parseStatus(status) : null;
+        String company = hasCompany ? companyName.trim() : null;
+        String email = hasStudentEmail ? studentEmail.trim() : null;
 
         if (hasCompany && hasStatus && hasStudentEmail) {
             return applicationRepository.findByCompanyNameContainingIgnoreCaseAndStatusAndStudentUserEmailContainingIgnoreCase(
-                    companyName, parsedStatus, studentEmail);
+                    company, parsedStatus, email);
         }
         if (hasCompany && hasStatus) {
-            return applicationRepository.findByCompanyNameContainingIgnoreCaseAndStatus(companyName, parsedStatus);
+            return applicationRepository.findByCompanyNameContainingIgnoreCaseAndStatus(company, parsedStatus);
         }
         if (hasCompany && hasStudentEmail) {
             return applicationRepository.findByCompanyNameContainingIgnoreCaseAndStudentUserEmailContainingIgnoreCase(
-                    companyName, studentEmail);
+                    company, email);
         }
         if (hasStatus && hasStudentEmail) {
-            return applicationRepository.findByStatusAndStudentUserEmailContainingIgnoreCase(parsedStatus, studentEmail);
+            return applicationRepository.findByStatusAndStudentUserEmailContainingIgnoreCase(parsedStatus, email);
         }
         if (hasCompany) {
-            return applicationRepository.findByCompanyNameContainingIgnoreCase(companyName);
+            return applicationRepository.findByCompanyNameContainingIgnoreCase(company);
         }
         if (hasStatus) {
             return applicationRepository.findByStatus(parsedStatus);
         }
         if (hasStudentEmail) {
-            return applicationRepository.findByStudentUserEmailContainingIgnoreCase(studentEmail);
+            return applicationRepository.findByStudentUserEmailContainingIgnoreCase(email);
         }
         return applicationRepository.findAll();
     }
@@ -144,16 +163,35 @@ public class ApplicationServiceImpl implements ApplicationService {
     }
 
     private ApplicationStatus parseStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            throw new BadRequestException("Application status is required");
+        }
         try {
             return ApplicationStatus.valueOf(status.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            throw new RuntimeException("Invalid application status: " + status);
+            throw new BadRequestException("Invalid application status: " + status);
         }
     }
 
     private void validateProfileCompletion(Student student) {
-        if (student.getCgpa() <= 0.0 || !StringUtils.hasText(student.getSkills()) || !StringUtils.hasText(student.getResumeLink())) {
-            throw new RuntimeException("Complete your profile with CGPA, skills, and resume link before applying");
+        if (student.getCgpa() <= 0.0
+                || !StudentProfileDefaults.hasRealSkills(student.getSkills())
+                || !StringUtils.hasText(student.getResumeLink())) {
+            throw new BadRequestException("Complete your profile with CGPA, skills, and resume link before applying");
+        }
+    }
+
+    private void validateEligibility(Student student, Company company) {
+        LocalDate deadline = company.getDeadline();
+        if (deadline != null && deadline.isBefore(LocalDate.now())) {
+            throw new BadRequestException("The application deadline for " + company.getName() + " has passed");
+        }
+
+        Double requiredCgpa = company.getEligibilityCgpa();
+        if (requiredCgpa != null && student.getCgpa() < requiredCgpa) {
+            throw new BadRequestException(String.format(
+                    "Your CGPA (%.2f) is below the minimum of %.2f required by %s",
+                    student.getCgpa(), requiredCgpa, company.getName()));
         }
     }
 
@@ -161,19 +199,13 @@ public class ApplicationServiceImpl implements ApplicationService {
         return studentRepository.findByUserEmail(studentEmail)
                 .orElseGet(() -> {
                     User user = userRepository.findByEmail(studentEmail)
-                            .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+                            .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
                     if (!"STUDENT".equalsIgnoreCase(user.getRole())) {
-                        throw new RuntimeException("Only students can apply to companies");
+                        throw new BadRequestException("Only students can apply to companies");
                     }
 
-                    Student studentProfile = new Student();
-                    studentProfile.setUser(user);
-                    studentProfile.setCgpa(0.0);
-                    studentProfile.setSkills("Profile not updated");
-                    studentProfile.setResumeLink(null);
-
-                    Student savedProfile = studentRepository.save(studentProfile);
+                    Student savedProfile = studentRepository.save(StudentProfileDefaults.newEmptyProfile(user));
                     logger.warn("Created missing student profile {} for user {}", savedProfile.getId(), studentEmail);
                     return savedProfile;
                 });
