@@ -40,6 +40,13 @@ A full-stack campus placement platform: a **Spring Boot 3** REST API with JWT au
 - Post, edit, filter, and delete companies (their applications are removed too)
 - Filter applications by company, status, and student email; move them through `APPLIED → SHORTLISTED → SELECTED / REJECTED`
 
+**Interface**
+- Tabbed navigation (*Opportunities / My applications / Profile* for students, *Overview / Students / Companies / Applications* for admins); the active tab is kept in the URL, so refresh and the back button work
+- Admin overview with a pipeline breakdown, companies closing soon, applicant counts, and recent applications
+- Instant search and filter chips, deadline countdowns, and an Applied → Shortlisted → Selected tracker for students
+- Toast notifications, confirmation dialogs that say exactly what a delete removes, loading skeletons, and helpful empty states
+- Works on phones (tables become stacked cards), follows the system dark mode, keyboard accessible, and respects reduced-motion settings
+
 **Platform**
 - Server-side rules: a student can only apply with a complete profile, a CGPA at or above the company's cut-off, before the deadline, and only once
 - Role-based authorization (`ADMIN`, `STUDENT`) with consistent JSON errors (`401`, `403`, `404`, `409`, `429`)
@@ -327,8 +334,10 @@ The backend suite covers:
 │   └── keep-backend-awake.yml      # pings the Render backend every 10 minutes
 ├── frontend/                       # React + Vite SPA
 │   ├── src/api.js                  # API client, backend wake-up and keep-alive
-│   ├── src/App.jsx                 # student and admin dashboards
-│   ├── src/components/BackendStatus.jsx
+│   ├── src/App.jsx                 # session, data loading, actions, routing
+│   ├── src/views/                  # AuthView, StudentView, AdminView
+│   ├── src/components/             # UI kit (ui.jsx), AppHeader, BackendStatus
+│   ├── src/lib/format.js           # dates, eligibility, formatting helpers
 │   ├── vercel.json, nginx.conf, Dockerfile
 ├── src/main/java/.../placementsystem/
 │   ├── config/                     # OpenAPI, admin bootstrap, legacy data migration
