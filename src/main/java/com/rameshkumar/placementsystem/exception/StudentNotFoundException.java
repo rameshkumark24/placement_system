@@ -1,7 +1,8 @@
 package com.rameshkumar.placementsystem.exception;
 
-public class StudentNotFoundException extends RuntimeException{
-    public StudentNotFoundException(String message){
+public class StudentNotFoundException extends ResourceNotFoundException {
+
+    public StudentNotFoundException(String message) {
         super(message);
     }
 }

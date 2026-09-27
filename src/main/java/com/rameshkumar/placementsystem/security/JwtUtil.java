@@ -4,6 +4,8 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,12 +19,17 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
+    private static final Logger logger = LoggerFactory.getLogger(JwtUtil.class);
+
+    public static final String DEV_SECRET = "placementSystemJwtSecretKey2026SecureKey123!";
+    private static final int MIN_SECRET_BYTES = 32;
+
     private static final String ROLE_CLAIM = "role";
     private static final String TOKEN_TYPE_CLAIM = "tokenType";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final String REFRESH_TOKEN_TYPE = "refresh";
 
-    private final String secretKey;
+    private final Key signingKey;
     private final long accessTokenExpirationMs;
     private final long refreshTokenExpirationMs;
 
@@ -30,7 +37,16 @@ public class JwtUtil {
             @Value("${jwt.secret}") String secretKey,
             @Value("${jwt.expiration-ms:1800000}") long accessTokenExpirationMs,
             @Value("${jwt.refresh-expiration-ms:604800000}") long refreshTokenExpirationMs) {
-        this.secretKey = secretKey;
+        // HS256 needs at least 256 bits. Failing here gives a clear startup error instead of
+        // a WeakKeyException on the first login attempt.
+        if (secretKey == null || secretKey.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be at least " + MIN_SECRET_BYTES + " bytes long for HS256 signing");
+        }
+        if (DEV_SECRET.equals(secretKey)) {
+            logger.warn("Using the built-in development JWT secret. Set JWT_SECRET to a private value in production.");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
@@ -56,7 +72,7 @@ public class JwtUtil {
                 .setSubject(username)
                 .setIssuedAt(issuedAt)
                 .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -67,11 +83,11 @@ public class JwtUtil {
 
     // EXTRACT ROLE
     public String extractRole(String token) {
-        return extractAllClaims(token).get(ROLE_CLAIM, String.class);
+        return parseClaims(token).get(ROLE_CLAIM, String.class);
     }
 
     public String extractTokenType(String token) {
-        return extractAllClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
+        return parseClaims(token).get(TOKEN_TYPE_CLAIM, String.class);
     }
 
     public Date extractExpiration(String token) {
@@ -79,38 +95,45 @@ public class JwtUtil {
     }
 
     public <T> T extractClaim(String token, Function<Claims,T> claimsResolver) {
-        Claims claims = extractAllClaims(token);
+        Claims claims = parseClaims(token);
         return claimsResolver.apply(claims);
     }
 
-    private Claims extractAllClaims(String token) {
+    /**
+     * Verifies the signature and expiry and returns the claims.
+     * Throws {@link io.jsonwebtoken.ExpiredJwtException} or another {@link io.jsonwebtoken.JwtException}
+     * when the token cannot be trusted.
+     */
+    public Claims parseClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
     }
 
-    private Boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+    public boolean isAccessToken(Claims claims) {
+        return ACCESS_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
+    }
+
+    public String getRole(Claims claims) {
+        return claims.get(ROLE_CLAIM, String.class);
     }
 
     public Boolean validateToken(String token, String username) {
-        String extractedUsername = extractUsername(token);
-        return extractedUsername.equals(username)
-                && !isTokenExpired(token)
-                && ACCESS_TOKEN_TYPE.equals(extractTokenType(token));
+        Claims claims = parseClaims(token);
+        return claims.getSubject().equals(username)
+                && claims.getExpiration().after(new Date())
+                && isAccessToken(claims);
     }
 
     public Boolean validateRefreshToken(String token) {
-        return !isTokenExpired(token) && REFRESH_TOKEN_TYPE.equals(extractTokenType(token));
+        Claims claims = parseClaims(token);
+        return claims.getExpiration().after(new Date())
+                && REFRESH_TOKEN_TYPE.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
     public long getAccessTokenExpirationMs() {
         return accessTokenExpirationMs;
-    }
-
-    private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 }

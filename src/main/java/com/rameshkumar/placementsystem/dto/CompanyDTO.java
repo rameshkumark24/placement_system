@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public class CompanyDTO {
@@ -13,9 +14,11 @@ public class CompanyDTO {
     private Long id;
 
     @NotBlank(message = "Company name cannot be empty")
+    @Size(max = 255, message = "Company name must be at most 255 characters")
     private String name;
 
     @NotBlank(message = "Role cannot be empty")
+    @Size(max = 255, message = "Role must be at most 255 characters")
     private String role;
 
     @NotNull(message = "Package cannot be empty")

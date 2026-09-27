@@ -2,17 +2,21 @@ package com.rameshkumar.placementsystem.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.rameshkumar.placementsystem.dto.CompanyDTO;
 import com.rameshkumar.placementsystem.entity.Company;
 import com.rameshkumar.placementsystem.exception.CompanyNotFoundException;
+import com.rameshkumar.placementsystem.repository.ApplicationRepository;
 import com.rameshkumar.placementsystem.repository.CompanyRepository;
 import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +26,9 @@ class CompanyServiceImplTest {
 
     @Mock
     private CompanyRepository companyRepository;
+
+    @Mock
+    private ApplicationRepository applicationRepository;
 
     @InjectMocks
     private CompanyServiceImpl companyService;
@@ -71,5 +78,24 @@ class CompanyServiceImplTest {
         when(companyRepository.findById(50L)).thenReturn(Optional.empty());
 
         assertThrows(CompanyNotFoundException.class, () -> companyService.updateCompany(50L, request));
+    }
+
+    @Test
+    void deleteCompanyRemovesItsApplicationsFirst() {
+        when(companyRepository.existsById(5L)).thenReturn(true);
+
+        companyService.deleteCompany(5L);
+
+        InOrder order = inOrder(applicationRepository, companyRepository);
+        order.verify(applicationRepository).deleteByCompanyId(5L);
+        order.verify(companyRepository).deleteById(5L);
+    }
+
+    @Test
+    void deleteCompanyThrowsWhenMissing() {
+        when(companyRepository.existsById(50L)).thenReturn(false);
+
+        assertThrows(CompanyNotFoundException.class, () -> companyService.deleteCompany(50L));
+        verify(applicationRepository, never()).deleteByCompanyId(50L);
     }
 }
