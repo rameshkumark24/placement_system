@@ -46,6 +46,7 @@ A full-stack campus placement platform: a **Spring Boot 3** REST API with JWT au
 - Instant search and filter chips, deadline countdowns, and an Applied → Shortlisted → Selected tracker for students
 - Toast notifications, confirmation dialogs that say exactly what a delete removes, loading skeletons, and helpful empty states
 - Works on phones (tables become stacked cards), follows the system dark mode, keyboard accessible, and respects reduced-motion settings
+- Professional type system (Inter for text, Plus Jakarta Sans for headings, a single size/weight scale, tabular numbers) and a slate-and-indigo palette whose text colours meet WCAG AA contrast in both light and dark mode
 
 **Platform**
 - Server-side rules: a student can only apply with a complete profile, a CGPA at or above the company's cut-off, before the deadline, and only once
